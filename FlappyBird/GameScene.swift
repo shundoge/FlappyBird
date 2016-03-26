@@ -12,12 +12,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
     var scrollNode:SKNode!
     var wallNode:SKNode!
     var bird:SKSpriteNode!
+    var treasure:SKSpriteNode!
     
     // 衝突判定カテゴリー ↓追加
     let birdCategory: UInt32 = 1 << 0       // 0...00001
     let groundCategory: UInt32 = 1 << 1     // 0...00010
     let wallCategory: UInt32 = 1 << 2       // 0...00100
     let scoreCategory: UInt32 = 1 << 3      // 0...01000
+    let treasureCategory: UInt32 = 1 << 4      // 0...10000
     
     // スコア
     let userDefaults:NSUserDefaults = NSUserDefaults.standardUserDefaults()
@@ -78,7 +80,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             
             // 鳥に縦方向の力を与える
             bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 15))
-        } else if bird.speed == 0 { // --- ここから ---
+        }
+        else if bird.speed == 0 { // --- ここから ---
             restart()
         } // --- ここまで追加 ---
     }
@@ -104,7 +107,20 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
                 userDefaults.setInteger(bestScore, forKey: "BEST")
                 userDefaults.synchronize()
             }
-        } else {
+        }
+        else if(contact.bodyA.categoryBitMask & treasureCategory) == treasureCategory || (contact.bodyB.categoryBitMask & treasureCategory) == treasureCategory {
+            let a = contact.bodyA.velocity.dy
+            let b = contact.bodyB.velocity.dy
+            if(a != 0 ) {
+                contact.bodyB.node?.removeFromParent()
+            }
+            if(b != 0 ) {
+                contact.bodyA.node?.removeFromParent()
+            }
+
+            
+        }
+        else {
             // 壁か地面と衝突した
             print("GameOver")
             
@@ -116,6 +132,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             let roll = SKAction.rotateByAngle(CGFloat(M_PI) * CGFloat(bird.position.y) * 0.01, duration:1)
             bird.runAction(roll, completion:{
                 self.bird.speed = 0
+                self.wallNode.removeAllActions()
             })
         }
     }
@@ -281,8 +298,32 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             wall.addChild(scoreNode)
             // --- ここまで追加 ---
             
-            wall.runAction(wallAnimation)
             
+            
+            
+            
+            // treasure用のノード --- ここから ---
+            let treasureTextureA = SKTexture(imageNamed: "diamond")
+            treasureTextureA.filteringMode = .Linear
+            let treasureTextureB = SKTexture(imageNamed: "diamond_Center")
+            treasureTextureB.filteringMode = .Linear
+            // 2種類のテクスチャを交互に変更するアニメーションを作成
+            let texuresAnimation = SKAction.animateWithTextures([treasureTextureA, treasureTextureB], timePerFrame: 0.2)
+            let flap = SKAction.repeatActionForever(texuresAnimation)
+            // スプライトを作成
+            self.treasure = SKSpriteNode(texture: treasureTextureA)
+            let random_t = self.getRandomNumber(Min: 0.3, Max: 0.7)
+            self.treasure.position = CGPoint(x: -upper.size.width * 2.5, y: upper.position.y * random_t)
+            
+            self.treasure.physicsBody = SKPhysicsBody(rectangleOfSize: treasureTextureA.size())
+            self.treasure.physicsBody?.dynamic = false
+            self.treasure.physicsBody?.categoryBitMask = self.treasureCategory
+            self.treasure.physicsBody?.contactTestBitMask = self.birdCategory
+            // アニメーションを設定
+            self.treasure.runAction(flap)
+            wall.addChild(self.treasure)
+            // --- ここまで追加 ---
+            wall.runAction(wallAnimation)
             self.wallNode.addChild(wall)
         })
         
@@ -300,6 +341,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         birdTextureA.filteringMode = .Linear
         let birdTextureB = SKTexture(imageNamed: "bird_b")
         birdTextureB.filteringMode = .Linear
+        // 鳥の画像を2種類読み込む
+        /*let birdTextureA = SKTexture(imageNamed: "diamond")
+        birdTextureA.filteringMode = .Linear
+        let birdTextureB = SKTexture(imageNamed: "diamond_Center")
+        birdTextureB.filteringMode = .Linear*/
         
         // 2種類のテクスチャを交互に変更するアニメーションを作成
         let texuresAnimation = SKAction.animateWithTextures([birdTextureA, birdTextureB], timePerFrame: 0.2)
@@ -326,6 +372,37 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         // スプライトを追加する
         addChild(bird)
     }
+ /*   func setupTreasure() {
+        // treasureの画像を2種類読み込む
+        let treasureTextureA = SKTexture(imageNamed: "treasure_a")
+        treasureTextureA.filteringMode = .Linear
+        let treasureTextureB = SKTexture(imageNamed: "treasure_b")
+        treasureTextureB.filteringMode = .Linear
+        
+        // 2種類のテクスチャを交互に変更するアニメーションを作成
+        let texuresAnimation = SKAction.animateWithTextures([treasureTextureA, treasureTextureB], timePerFrame: 0.2)
+        let flap = SKAction.repeatActionForever(texuresAnimation)
+        // スプライトを作成
+        treasure = SKSpriteNode(texture: treasureTextureA)
+        treasure.position = CGPoint(x: self.frame.size.width * 0.5, y:self.frame.size.height * 0.7)
+        
+        // 衝突のカテゴリー設定
+        treasure.physicsBody?.categoryBitMask = birdCategory // ←追加
+        
+        // アニメーションを設定
+        treasure.runAction(flap)
+        // シーンにスプライトを追加する
+        addChild(treasure)
+    }
+    */
+    /*
+    乱数を生成するメソッド.
+    */
+    func getRandomNumber(Min _Min : CGFloat, Max _Max : CGFloat)->CGFloat {
+        
+        return ( CGFloat(arc4random_uniform(UINT32_MAX)) / CGFloat(UINT32_MAX) ) * (_Max - _Min) + _Min
+    }
+
     
 }
 
