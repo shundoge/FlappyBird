@@ -97,7 +97,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         }
         else if bird.speed == 0 {
             restart()
-        } 
+        }
     }
     
     // SKPhysicsContactDelegateのメソッド。衝突したときに呼ばれる
