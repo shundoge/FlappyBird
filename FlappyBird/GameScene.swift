@@ -6,6 +6,7 @@
 //  Copyright © 2016年 shunichi.tanaka. All rights reserved.
 //
 import SpriteKit
+import AudioToolbox
 
 class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
     
@@ -24,8 +25,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
     // スコア
     let userDefaults:NSUserDefaults = NSUserDefaults.standardUserDefaults()
     var score = 0
-    var scoreLabelNode:SKLabelNode! // ←追加
-    var bestScoreLabelNode:SKLabelNode! // ←追加
+    var scoreLabelNode:SKLabelNode!
+    var dscore = 0
+    var dscoreLabelNode:SKLabelNode!
+    var tscore = 0 //score + dscore
+   
+    var bestScoreLabelNode:SKLabelNode!
 
     func setupScoreLabel() {
         score = 0
@@ -37,9 +42,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         scoreLabelNode.text = "Score:\(score)"
         self.addChild(scoreLabelNode)
         
+        dscore = 0
+        dscoreLabelNode = SKLabelNode()
+        dscoreLabelNode.fontColor = UIColor.blackColor()
+        dscoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 60)
+        dscoreLabelNode.zPosition = 100 // 一番手前に表示する
+        dscoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.Left
+        dscoreLabelNode.text = "Diamonds:\(dscore)"
+        self.addChild(dscoreLabelNode)
+
         bestScoreLabelNode = SKLabelNode()
         bestScoreLabelNode.fontColor = UIColor.blackColor()
-        bestScoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 60)
+        bestScoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 90)
         bestScoreLabelNode.zPosition = 100 // 一番手前に表示する
         bestScoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.Left
         
@@ -47,7 +61,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         bestScoreLabelNode.text = "Best Score:\(bestScore)"
         self.addChild(bestScoreLabelNode)
     }
-
+ 
     // SKView上にシーンが表示されたときに呼ばれるメソッド
     override func didMoveToView(view: SKView) {
         
@@ -81,9 +95,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             // 鳥に縦方向の力を与える
             bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 15))
         }
-        else if bird.speed == 0 { // --- ここから ---
+        else if bird.speed == 0 {
             restart()
-        } // --- ここまで追加 ---
+        } 
     }
     
     // SKPhysicsContactDelegateのメソッド。衝突したときに呼ばれる
@@ -97,16 +111,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             // スコア用の物体と衝突した
             print("ScoreUp")
             score++
+            tscore = score + dscore
             scoreLabelNode.text = "Score:\(score)" // ←追加
-            
-            // ベストスコア更新か確認する
-            var bestScore = userDefaults.integerForKey("BEST")
-            if score > bestScore {
-                bestScore = score
-                bestScoreLabelNode.text = "Best Score:\(bestScore)" // ←追加
-                userDefaults.setInteger(bestScore, forKey: "BEST")
-                userDefaults.synchronize()
-            }
+            bestScore()
         }
         else if(contact.bodyA.categoryBitMask & treasureCategory) == treasureCategory || (contact.bodyB.categoryBitMask & treasureCategory) == treasureCategory {
             let a = contact.bodyA.velocity.dy
@@ -117,7 +124,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             if(b != 0 ) {
                 contact.bodyA.node?.removeFromParent()
             }
-
+            let soundIdRing:SystemSoundID = 1331  // Tiptoes.caf
+            AudioServicesPlaySystemSound(soundIdRing)
+            dscore++
+            tscore = score + dscore
+            dscoreLabelNode.text = "Diamonds:\(dscore)"
+            bestScore()
             
         }
         else {
@@ -136,9 +148,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             })
         }
     }
+    func bestScore() {
+        // ベストスコア更新か確認する
+        var bestScore = userDefaults.integerForKey("BEST")
+        if  tscore > bestScore {
+            bestScore = tscore
+            bestScoreLabelNode.text = "Best Score:\(bestScore)" // ←追加
+            userDefaults.setInteger(bestScore, forKey: "BEST")
+            userDefaults.synchronize()
+        }
+
+    }
     func restart() {
         score = 0
-        scoreLabelNode.text = String("Score:\(score)") // ←追加
+        dscore = 0
+        tscore = 0
+        scoreLabelNode.text = String("Score:\(score)")
+        dscoreLabelNode.text = String("Diamonds:\(dscore)")
         
         bird.position = CGPoint(x: self.frame.size.width * 0.2, y:self.frame.size.height * 0.7)
         bird.physicsBody?.velocity = CGVector.zero
@@ -312,9 +338,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             let flap = SKAction.repeatActionForever(texuresAnimation)
             // スプライトを作成
             self.treasure = SKSpriteNode(texture: treasureTextureA)
-            let random_t = self.getRandomNumber(Min: 0.3, Max: 0.7)
+            let random_t = self.getRandomNumber(Min: 0.3, Max: 0.7)//CGFloat用ランダマイザー
             self.treasure.position = CGPoint(x: -upper.size.width * 2.5, y: upper.position.y * random_t)
-            
             self.treasure.physicsBody = SKPhysicsBody(rectangleOfSize: treasureTextureA.size())
             self.treasure.physicsBody?.dynamic = false
             self.treasure.physicsBody?.categoryBitMask = self.treasureCategory
@@ -341,11 +366,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         birdTextureA.filteringMode = .Linear
         let birdTextureB = SKTexture(imageNamed: "bird_b")
         birdTextureB.filteringMode = .Linear
-        // 鳥の画像を2種類読み込む
-        /*let birdTextureA = SKTexture(imageNamed: "diamond")
-        birdTextureA.filteringMode = .Linear
-        let birdTextureB = SKTexture(imageNamed: "diamond_Center")
-        birdTextureB.filteringMode = .Linear*/
         
         // 2種類のテクスチャを交互に変更するアニメーションを作成
         let texuresAnimation = SKAction.animateWithTextures([birdTextureA, birdTextureB], timePerFrame: 0.2)
@@ -372,29 +392,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         // スプライトを追加する
         addChild(bird)
     }
- /*   func setupTreasure() {
-        // treasureの画像を2種類読み込む
-        let treasureTextureA = SKTexture(imageNamed: "treasure_a")
-        treasureTextureA.filteringMode = .Linear
-        let treasureTextureB = SKTexture(imageNamed: "treasure_b")
-        treasureTextureB.filteringMode = .Linear
-        
-        // 2種類のテクスチャを交互に変更するアニメーションを作成
-        let texuresAnimation = SKAction.animateWithTextures([treasureTextureA, treasureTextureB], timePerFrame: 0.2)
-        let flap = SKAction.repeatActionForever(texuresAnimation)
-        // スプライトを作成
-        treasure = SKSpriteNode(texture: treasureTextureA)
-        treasure.position = CGPoint(x: self.frame.size.width * 0.5, y:self.frame.size.height * 0.7)
-        
-        // 衝突のカテゴリー設定
-        treasure.physicsBody?.categoryBitMask = birdCategory // ←追加
-        
-        // アニメーションを設定
-        treasure.runAction(flap)
-        // シーンにスプライトを追加する
-        addChild(treasure)
-    }
-    */
+
     /*
     乱数を生成するメソッド.
     */
