@@ -8,13 +8,14 @@
 import SpriteKit
 import AudioToolbox
 
+
 class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
     
     var scrollNode:SKNode!
     var wallNode:SKNode!
     var bird:SKSpriteNode!
-    var treasure:SKSpriteNode!
-    
+    var treasure:SKNode!
+    //var audioPlayer:AVAudioPlayer!
     // 衝突判定カテゴリー ↓追加
     let birdCategory: UInt32 = 1 << 0       // 0...00001
     let groundCategory: UInt32 = 1 << 1     // 0...00010
@@ -39,7 +40,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         scoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 30)
         scoreLabelNode.zPosition = 100 // 一番手前に表示する
         scoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.Left
-        scoreLabelNode.text = "Score:\(score)"
+        //scoreLabelNode.text = "Gate:\(score) Diamonds\(dscore)" // ←追加
+        //dscoreLabelNode.text = "Score:\(tscore)"
         self.addChild(scoreLabelNode)
         
         dscore = 0
@@ -48,7 +50,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         dscoreLabelNode.position = CGPoint(x: 10, y: self.frame.size.height - 60)
         dscoreLabelNode.zPosition = 100 // 一番手前に表示する
         dscoreLabelNode.horizontalAlignmentMode = SKLabelHorizontalAlignmentMode.Left
-        dscoreLabelNode.text = "Diamonds:\(dscore)"
+        scoreLabelNode.text = "Gate:\(score) Diamonds\(dscore)" // ←追加
+        dscoreLabelNode.text = "Score:\(tscore)"
         self.addChild(dscoreLabelNode)
 
         bestScoreLabelNode = SKLabelNode()
@@ -110,9 +113,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         if (contact.bodyA.categoryBitMask & scoreCategory) == scoreCategory || (contact.bodyB.categoryBitMask & scoreCategory) == scoreCategory {
             // スコア用の物体と衝突した
             print("ScoreUp")
-            score++
+            score += 1
             tscore = score + dscore
-            scoreLabelNode.text = "Score:\(score)" // ←追加
+            scoreLabelNode.text = "Gate:\(score) Diamonds\(dscore)" // ←追加
+            dscoreLabelNode.text = "Score:\(tscore)"
             bestScore()
         }
         else if(contact.bodyA.categoryBitMask & treasureCategory) == treasureCategory || (contact.bodyB.categoryBitMask & treasureCategory) == treasureCategory {
@@ -125,10 +129,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
                 contact.bodyA.node?.removeFromParent()
             }
             let soundIdRing:SystemSoundID = 1331  // Tiptoes.caf
+            if(bird.physicsBody?.velocity.dy  < 0){
+                bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: 30))
+            }
+            else{
+                bird.physicsBody?.applyImpulse(CGVector(dx: 0, dy: -15))
+            }
             AudioServicesPlaySystemSound(soundIdRing)
-            dscore++
+            dscore += 1
             tscore = score + dscore
-            dscoreLabelNode.text = "Diamonds:\(dscore)"
+            scoreLabelNode.text = "Gate:\(score) Diamonds\(dscore)" // ←追加
+            dscoreLabelNode.text = "Score:\(tscore)"
             bestScore()
             
         }
@@ -145,7 +156,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             bird.runAction(roll, completion:{
                 self.bird.speed = 0
                 self.wallNode.removeAllActions()
+                self.treasure.removeAllActions()
             })
+            scrollNode.removeAllActions()
         }
     }
     func bestScore() {
@@ -163,8 +176,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
         score = 0
         dscore = 0
         tscore = 0
-        scoreLabelNode.text = String("Score:\(score)")
-        dscoreLabelNode.text = String("Diamonds:\(dscore)")
+        scoreLabelNode.text = "Gate:\(score) Diamonds\(dscore)" // ←追加
+        dscoreLabelNode.text = "Score:\(tscore)"
         
         bird.position = CGPoint(x: self.frame.size.width * 0.2, y:self.frame.size.height * 0.7)
         bird.physicsBody?.velocity = CGVector.zero
@@ -345,8 +358,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate /* 追加 */ {
             self.treasure.physicsBody?.categoryBitMask = self.treasureCategory
             self.treasure.physicsBody?.contactTestBitMask = self.birdCategory
             // アニメーションを設定
-            self.treasure.runAction(flap)
-            wall.addChild(self.treasure)
+            if(self.scrollNode.speed > 0){
+                self.treasure.runAction(flap)
+                wall.addChild(self.treasure)
+            }
             // --- ここまで追加 ---
             wall.runAction(wallAnimation)
             self.wallNode.addChild(wall)

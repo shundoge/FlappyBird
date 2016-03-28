@@ -292,6 +292,7 @@
 				CF459EE41C9FAA0700BBD028 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
